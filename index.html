@@ -69,6 +69,9 @@
   .chips span { font-size: 12px; padding: 6px 12px; border-radius: 99px; background: var(--card); box-shadow: inset 0 0 0 1px var(--frame); color: var(--sub); cursor: pointer; user-select: none; -webkit-user-select: none; transition: transform .12s var(--ease); }
   .chips span:active { transform: scale(.94); }
   .chips span.on { background: var(--ink); color: #fff; box-shadow: none; }
+  /* 選日期：透明的日期欄直接蓋在膠囊上，手機點下去就是系統的日期選單 */
+  .chips .pick { position: relative; overflow: hidden; }
+  .chips .pick input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; font-size: 16px; border: 0; cursor: pointer; -webkit-appearance: none; appearance: none; }
   .chips .lab { background: none; box-shadow: none; padding-left: 0; cursor: default; }
   .scroll-chips { flex-wrap: nowrap; overflow-x: auto; margin: 0 2px 6px; scrollbar-width: none; }
   .scroll-chips::-webkit-scrollbar { display: none; }
@@ -245,7 +248,6 @@
     <div class="chips" id="sh-cats"></div>
     <div class="lbl" style="margin-top:10px">日期</div>
     <div class="chips" id="sh-days"></div>
-    <input type="date" id="sh-date" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;left:0;bottom:0">
     <div class="keys num" id="sh-keys"></div>
     <button class="btn" id="sh-save">記下來</button>
     <button class="btn danger" id="sh-del" style="display:none">刪除這筆</button>
@@ -270,7 +272,7 @@
 </div>
 
 <script>
-const VER=/*VER*/'20261123144000';
+const VER=/*VER*/'20261123144352';
 const API = "https://script.google.com/macros/s/AKfycbwHtmJ9G5ySWGqCqw52DluNFGaHKyvuKEqg1At8jhcn5VYTHLEwAHIi6HSkVeJCU9czbA/exec";
 const CATS = ["飲食", "居家", "交通", "購物", "娛樂", "健康", "軟體", "其他"];
 const KW = {
@@ -298,6 +300,7 @@ const todayKey = () => { const d = new Date(); return d.getFullYear() + "-" + (d
 const parseKey = k => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
 const dayKey = d => d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
 const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const isoDate = k => { const [y, m, d] = k.split("-"); return y + "-" + m.padStart(2, "0") + "-" + d.padStart(2, "0"); };
 const md = k => { const [, m, d] = k.split("-"); return m + "/" + d; };
 function guess(item) {
   const t = (item || "").trim(); if (!t) return null;
@@ -511,7 +514,7 @@ function drawSheet() {
   const near = [0, 1, 2].map(i => dayKey(addDays(new Date(), -i)));
   const other = !near.includes(sh.date);
   $("sh-days").innerHTML = ["今天", "昨天", "前天"].map((d, i) => `<span class="${near[i] === sh.date ? "on" : ""}" data-shday="${near[i]}">${d}</span>`).join("")
-    + `<span class="${other ? "on" : ""}" data-shday="pick">${other ? fmtDay(sh.date) : "選日期"}</span>`;
+    + `<span class="pick${other ? " on" : ""}">${other ? fmtDay(sh.date) : "選日期"}<input type="date" id="sh-date" value="${isoDate(sh.date)}" max="${isoDate(todayKey())}"></span>`;
   $("sh-save").disabled = !Number(sh.amt);
 }
 $("sh-keys").innerHTML = ["1","2","3","4","5","6","7","8","9","00","0","⌫"].map(k => `<span data-key="${k}">${k}</span>`).join("");
@@ -526,14 +529,14 @@ $("sh-note").oninput = e => { sh.note = e.target.value; };
 $("sh-cats").onclick = e => { const t = e.target.closest("[data-shcat]"); if (!t) return; sh.cat = t.dataset.shcat; sh.catTouched = true; drawSheet(); };
 $("sh-days").onclick = e => {
   const t = e.target.closest("[data-shday]"); if (!t) return;
-  if (t.dataset.shday === "pick") {
-    const [y, m, d] = sh.date.split("-"); $("sh-date").value = y + "-" + m.padStart(2, "0") + "-" + d.padStart(2, "0");
-    try { $("sh-date").showPicker(); } catch (_) { $("sh-date").focus(); $("sh-date").click(); }
-    return;
-  }
   sh.date = t.dataset.shday; drawSheet();
 };
-$("sh-date").onchange = e => { if (!e.target.value || !sh) return; const [y, m, d] = e.target.value.split("-").map(Number); sh.date = dayKey(new Date(y, m - 1, d)); drawSheet(); };
+$("sh-days").addEventListener("change", e => {
+  if (e.target.id !== "sh-date" || !e.target.value || !sh) return;
+  const [y, m, d] = e.target.value.split("-").map(Number); sh.date = dayKey(new Date(y, m - 1, d)); drawSheet();
+});
+// 電腦的 Chrome 點透明欄不一定會開日曆，補一個 showPicker
+$("sh-days").addEventListener("click", e => { if (e.target.id === "sh-date" && e.target.showPicker && !/iPhone|iPad|Android/.test(navigator.userAgent)) { try { e.target.showPicker(); } catch (_) {} } });
 $("sh-cancel").onclick = closeSheets; $("dim").onclick = closeSheets;
 [$("sh-item"), $("sh-note")].forEach(el => el.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); el.blur(); } }));
 
