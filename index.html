@@ -44,7 +44,7 @@
   .track i { display: block; height: 100%; background: var(--ink); border-radius: 99px; transition: width .3s var(--ease); max-width: 100%; }
   .kv { display: flex; justify-content: space-between; font-size: 12px; color: var(--sub); }
   .kv b { color: var(--ink); font-weight: 500; }
-  .stats { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr 1fr; border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; }
   .stats div { text-align: center; }
   .stats div + div { border-left: 1px solid var(--line); }
   .stats b { display: block; font-size: 16px; font-weight: 600; }
@@ -160,6 +160,7 @@
       <div class="track"><i id="h-bar" style="width:0"></i></div>
       <div class="kv"><span>已花 <b class="num" id="h-spent">—</b></span></div>
       <div class="stats num">
+        <div><b id="h-daily">—</b><span>平均每天可花</span></div>
         <div><b id="h-today">—</b><span>今天還能花</span></div>
         <div><b id="h-days">—</b><span>天到存款日</span></div>
       </div>
@@ -269,7 +270,7 @@
 </div>
 
 <script>
-const VER=/*VER*/'20261123143023';
+const VER=/*VER*/'20261123144000';
 const API = "https://script.google.com/macros/s/AKfycbwHtmJ9G5ySWGqCqw52DluNFGaHKyvuKEqg1At8jhcn5VYTHLEwAHIi6HSkVeJCU9czbA/exec";
 const CATS = ["飲食", "居家", "交通", "購物", "娛樂", "健康", "軟體", "其他"];
 const KW = {
@@ -397,6 +398,8 @@ function renderHome() {
   $("h-left").classList.toggle("neg", r.left < 0);
   $("h-bar").style.width = Math.min(Math.max(r.spent / (D.budget || 1), 0), 1) * 100 + "%";
   $("h-spent").textContent = money(r.spent);
+  $("h-daily").textContent = money(r.left / r.days);
+  $("h-daily").style.color = r.left < 0 ? "var(--red)" : "";
   $("h-today").textContent = money(r.todayLeft);
   $("h-today").style.color = r.todayLeft < 0 ? "var(--red)" : "";
   $("h-days").textContent = D.daysLeft;
