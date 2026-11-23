@@ -27,15 +27,19 @@
   #app { width: 390px; height: min(844px, 100vh); border-radius: 46px; border: 10px solid #262624; overflow: hidden; position: relative; background: var(--bg); }
   @media (max-width: 600px) { body { display: block; background: var(--bg); } #app { width: 100%; height: 100%; border: 0; border-radius: 0; } }
 
-  .page { position: absolute; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: calc(var(--top) + 18px) 12px calc(var(--bot) + 100px); display: none; }
+  .page { position: absolute; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: calc(max(var(--top), 20px) + 24px) 14px calc(var(--bot) + 104px); display: none; }
+  .topcover { position: absolute; left: 0; right: 0; top: 0; height: calc(max(var(--top), 20px) + 8px); background: var(--bg); z-index: 4; pointer-events: none; }
+  @media (min-width: 601px) { .topcover { display: none; } }
   @media (min-width: 601px) { .page { padding-top: 46px; } }
   .page.on { display: block; animation: fade .18s var(--ease); }
   @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-  .head { display: flex; justify-content: space-between; align-items: flex-end; margin: 0 2px 10px; }
+  .head { display: flex; justify-content: space-between; align-items: flex-end; margin: 0 4px 12px; }
   .head .t { font-size: 16px; font-weight: 600; }
   .head .s { font-size: 11px; color: var(--sub); }
-  .panel { background: var(--card); border-radius: 14px; padding: 12px 14px; margin-bottom: 12px; }
-  .cap { font-size: 11px; color: var(--sub); display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .panel { background: var(--card); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; }
+  .panel.list { padding: 4px 16px; }
+  .panel.list .cap { padding-top: 10px; margin-bottom: 2px; }
+  .cap { font-size: 11px; color: var(--sub); display: flex; justify-content: space-between; line-height: 1.4; margin-bottom: 8px; }
   .cap a { color: var(--sub); cursor: pointer; }
   .big { font-size: 32px; font-weight: 600; letter-spacing: -.5px; }
   .big small { font-size: 13px; color: var(--sub); font-weight: 400; margin-left: 4px; }
@@ -56,14 +60,14 @@
   .cat .bar i { display: block; height: 100%; border-radius: 99px; background: var(--ink); transition: width .3s var(--ease); }
   .cat .m { width: 64px; text-align: right; }
   .diff { font-size: 11px; width: 58px; text-align: right; color: var(--sub); }
-  .item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; margin: 0 -14px; font-size: 13px; cursor: pointer; transition: background 1.2s ease; }
+  .item { display: flex; align-items: center; gap: 10px; padding: 11px 16px; margin: 0 -16px; font-size: 13px; cursor: pointer; transition: background 1.2s ease; }
   .item + .item { border-top: 1px solid var(--line); }
   .item .n { flex: 1; min-width: 0; }
   .item .n small { display: block; font-size: 11px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .item.flash { background: var(--flash); transition: none; }
   .item.pending .num::after { content: " ·"; color: var(--faint); }
-  .ledger { background: var(--card); border-radius: 14px; padding: 0 14px; margin-bottom: 4px; }
-  .day { font-size: 11px; color: var(--sub); display: flex; justify-content: space-between; padding: 10px 2px 4px; }
+  .ledger { background: var(--card); border-radius: 14px; padding: 0 16px; margin-bottom: 4px; }
+  .day { font-size: 11px; color: var(--sub); display: flex; justify-content: space-between; padding: 12px 4px 6px; }
   .empty { color: var(--sub); font-size: 12px; text-align: center; padding: 22px 0; }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; }
   .chips span { font-size: 12px; padding: 6px 12px; border-radius: 99px; background: var(--card); box-shadow: inset 0 0 0 1px var(--frame); color: var(--sub); cursor: pointer; user-select: none; -webkit-user-select: none; transition: transform .12s var(--ease); }
@@ -80,7 +84,7 @@
   .cal-g i.today { box-shadow: inset 0 0 0 1px var(--frame); }
   .cal-g i.on { background: var(--ink); color: #fff; box-shadow: none; }
   .chips .lab { background: none; box-shadow: none; padding-left: 0; cursor: default; }
-  .scroll-chips { flex-wrap: nowrap; overflow-x: auto; margin: 0 2px 6px; scrollbar-width: none; }
+  .scroll-chips { flex-wrap: nowrap; overflow-x: auto; margin: 0 0 6px; scrollbar-width: none; }
   .scroll-chips::-webkit-scrollbar { display: none; }
   .scroll-chips span { flex: none; }
   .bunny-wrap { position: relative; }
@@ -153,6 +157,7 @@
 </head>
 <body>
 <div id="app">
+  <div class="topcover"></div>
   <svg width="0" height="0" style="position:absolute">
     <symbol id="i-home" viewBox="0 0 24 24"><path d="M5 12l-2 0l9-9l9 9l-2 0"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/><path d="M10 21v-6h4v6"/></symbol>
     <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M5 6v.01M5 12v.01M5 18v.01"/></symbol>
@@ -175,7 +180,7 @@
         <div><b id="h-days">—</b><span>天到存款日</span></div>
       </div>
     </div>
-    <div class="chips" id="h-quick" style="margin:-2px 2px 12px"></div>
+    <div class="chips" id="h-quick" style="margin:0 2px 12px"></div>
     <div class="panel">
       <div class="cap"><span>支出分類</span><span>點一類看明細</span></div>
       <div id="h-cats"></div>
@@ -211,17 +216,18 @@
   <!-- 設定 -->
   <div class="page" id="p-set">
     <div class="head"><div><div class="t">設定</div></div></div>
-    <div class="panel" style="padding:0 14px">
+    <div class="panel list">
       <div class="set tap" id="s-budget-row"><span>這期可花預算</span><span class="num" id="s-budget"></span></div>
       <div class="set"><span>存款日</span><span>每月 15 號</span></div>
     </div>
-    <div class="panel" style="padding:0 14px">
-      <div class="cap" style="margin:12px 0 0">固定支出（只顯示、不扣預算）</div>
+    <div class="panel list">
+      <div class="cap">固定支出（只顯示、不扣預算）</div>
       <div id="s-fixed"></div>
       <div class="set tap" id="s-fixed-add"><span style="color:var(--sub)">＋ 新增固定支出</span><span></span></div>
     </div>
-    <div class="panel" style="padding:0 14px">
-      <div class="cap" style="margin:12px 0 0">每月存進儲蓄帳戶</div>
+    <div class="panel list">
+      <div class="cap">每月存進儲蓄帳戶</div>
+      <div class="bars num" id="s-mon-bars" style="height:110px;margin:10px 0 6px"></div>
       <div id="s-mon-list"></div>
       <div class="set tap" id="s-mon-add"><span style="color:var(--sub)">＋ 記錄這個月存了多少</span><span></span></div>
     </div>
@@ -229,7 +235,7 @@
       <button class="btn ghost" style="margin:0" id="s-end">結束這一期，開始新的一期</button>
       <div style="font-size:11px;color:var(--sub);text-align:center;margin-top:8px;line-height:1.6" id="s-end-note"></div>
     </div>
-    <div style="font-size:11px;color:var(--faint);text-align:center;margin:4px 0 8px" id="s-ver"></div>
+    <div style="font-size:11px;color:var(--faint);text-align:center;margin:6px 0 10px" id="s-ver"></div>
   </div>
 
   <div class="toast" id="toast"><span id="toast-t"></span><b id="toast-undo">復原</b></div>
@@ -282,7 +288,7 @@
 </div>
 
 <script>
-const VER=/*VER*/'20261124013823';
+const VER=/*VER*/'20261124014245';
 const API = "https://script.google.com/macros/s/AKfycbwHtmJ9G5ySWGqCqw52DluNFGaHKyvuKEqg1At8jhcn5VYTHLEwAHIi6HSkVeJCU9czbA/exec";
 const CATS = ["飲食", "居家", "交通", "購物", "娛樂", "健康", "軟體", "其他"];
 const KW = {
@@ -473,6 +479,9 @@ function renderSet() {
   $("s-budget").textContent = money(D.budget);
   $("s-fixed").innerHTML = D.fixed.map((f, i) => `<div class="set tap" data-fixed="${i}"><span>${esc(f.item)}</span><span class="num">${money(f.amt)}</span></div>`).join("");
   const mon = D.monthly || [];
+  const last6 = mon.slice(0, 6).reverse(), mmax = Math.max(...last6.map(m => m.amt), 1), thisMon = monKey(new Date());
+  $("s-mon-bars").style.display = last6.length ? "" : "none";
+  $("s-mon-bars").innerHTML = last6.map(m => `<div class="b${m.month === thisMon ? " cur" : ""}" data-mon="${m.month}">$${(m.amt / 1000).toFixed(m.amt % 1000 ? 1 : 0)}k<i style="height:${m.amt / mmax * 72}%"></i>${Number(m.month.split("-")[1])}月</div>`).join("");
   $("s-mon-list").innerHTML = mon.map(m =>
     `<div class="set tap" data-mon="${m.month}"><span>${monLabel(m.month)}${m.note ? `<small style="color:var(--sub);margin-left:6px">${esc(m.note)}</small>` : ""}</span><span class="num">${money(m.amt)}</span></div>`).join("");
   $("s-end-note").innerHTML = "明細會收進「回顧」，預算設回 " + money(D.defaultBudget || 35000) + "。<br>按錯了下面會出現「復原」。";
