@@ -203,7 +203,7 @@
     </div>
     <div class="seg" id="r-seg"></div>
     <div class="panel">
-      <div class="cap"><span id="r-title"></span><span>比上一期</span></div>
+      <div class="cap"><span id="r-title"></span><span>比上一個月</span></div>
       <div id="r-cats"></div>
     </div>
   </div>
@@ -221,10 +221,10 @@
       <div class="set tap" id="s-fixed-add"><span style="color:var(--sub)">＋ 新增固定支出</span><span></span></div>
     </div>
     <div class="panel" style="padding:0 14px">
-      <div class="cap" style="margin:12px 0 0">儲蓄帳戶</div>
-      <div class="set"><span>總存款</span><span class="num" style="color:var(--ink);font-weight:600" id="s-sav-total"></span></div>
-      <div class="row2" style="padding:4px 0 12px"><button class="btn ghost" id="s-dep">存入</button><button class="btn ghost" id="s-wd">提領</button></div>
-      <div id="s-sav-list"></div>
+      <div class="cap" style="margin:12px 0 0">每月存進儲蓄帳戶</div>
+      <div class="set"><span>累計存了</span><span class="num" style="color:var(--ink);font-weight:600" id="s-mon-total"></span></div>
+      <div id="s-mon-list"></div>
+      <div class="set tap" id="s-mon-add"><span style="color:var(--sub)">＋ 記錄這個月存了多少</span><span></span></div>
     </div>
     <div class="panel">
       <button class="btn ghost" style="margin:0" id="s-end">結束這一期，開始新的一期</button>
@@ -266,9 +266,11 @@
   <div class="sheet" id="form">
     <div class="grab"></div>
     <div class="ttl"><b id="f-title" style="font-weight:600"></b><span id="f-cancel">取消</span></div>
+    <div class="chips" id="f-chips" style="margin-bottom:10px"></div>
     <div class="field" id="f-text-wrap"><input id="f-text" autocomplete="off" enterkeyhint="next"></div>
     <div class="field focus"><small>金額</small><input id="f-amt" class="amt-in num" inputmode="numeric" pattern="[0-9]*" autocomplete="off" enterkeyhint="done"></div>
     <button class="btn" id="f-save">好</button>
+    <button class="btn danger" id="f-del" style="display:none">刪除</button>
   </div>
 
   <div class="login" id="login">
@@ -281,7 +283,7 @@
 </div>
 
 <script>
-const VER=/*VER*/'20261123145154';
+const VER=/*VER*/'20261124013717';
 const API = "https://script.google.com/macros/s/AKfycbwHtmJ9G5ySWGqCqw52DluNFGaHKyvuKEqg1At8jhcn5VYTHLEwAHIi6HSkVeJCU9czbA/exec";
 const CATS = ["飲食", "居家", "交通", "購物", "娛樂", "健康", "軟體", "其他"];
 const KW = {
@@ -446,7 +448,7 @@ function renderList() {
 }
 
 function renderReview() {
-  const cur = { name: "本期", range: md(D.period.start) + " – " + md(D.period.end) + "（進行中）", total: calc().spent, cats: catTotals(D.entries), cur: true };
+  const cur = { name: "本月", range: md(D.period.start) + " – " + md(D.period.end) + "（進行中）", total: calc().spent, cats: catTotals(D.entries), cur: true };
   const hist = (D.history || []).filter(h => h.start !== D.period.start).map(h => {
     const m = Number(h.start.split("-")[1]);
     return { name: m + "月", range: md(h.start) + " – " + md(h.end), total: h.total, cats: h.cats };
@@ -471,9 +473,10 @@ function renderReview() {
 function renderSet() {
   $("s-budget").textContent = money(D.budget);
   $("s-fixed").innerHTML = D.fixed.map((f, i) => `<div class="set tap" data-fixed="${i}"><span>${esc(f.item)}</span><span class="num">${money(f.amt)}</span></div>`).join("");
-  $("s-sav-total").textContent = money(D.savings.total);
-  $("s-sav-list").innerHTML = D.savings.list.slice(0, 5).map(s =>
-    `<div class="item" data-sav="${s.id}"><div class="n">${s.amt < 0 ? "提領" : "存入"}${s.note ? `<small>${esc(s.note)}</small>` : ""}</div><div class="num" style="color:var(--sub)">${s.date ? md(s.date) : ""}</div><div class="num">${money(s.amt)}</div></div>`).join("");
+  const mon = D.monthly || [];
+  $("s-mon-total").textContent = money(mon.reduce((t, m) => t + m.amt, 0));
+  $("s-mon-list").innerHTML = mon.map(m =>
+    `<div class="set tap" data-mon="${m.month}"><span>${monLabel(m.month)}${m.note ? `<small style="color:var(--sub);margin-left:6px">${esc(m.note)}</small>` : ""}</span><span class="num">${money(m.amt)}</span></div>`).join("");
   $("s-end-note").innerHTML = "明細會收進「回顧」，預算設回 " + money(D.defaultBudget || 35000) + "。<br>按錯了下面會出現「復原」。";
   $("s-ver").textContent = "版本 " + (VER === "dev" ? "開發中" : VER.slice(4, 8).replace(/(\d\d)(\d\d)/, "$1/$2") + " " + VER.slice(8, 12).replace(/(\d\d)(\d\d)/, "$1:$2"));
 }
@@ -617,8 +620,10 @@ function openForm(o) {
   $("f-text").placeholder = o.textPh || ""; $("f-text").value = o.text || "";
   $("f-amt").value = o.amt ? String(o.amt) : "";
   $("f-save").textContent = o.ok || "好";
+  drawFormChips();
+  $("f-del").style.display = o.onDel ? "block" : "none";
   $("dim").classList.add("on"); $("form").classList.add("on");
-  setTimeout(() => (o.text !== undefined && !o.text ? $("f-text") : $("f-amt")).focus(), 260);
+  setTimeout(() => (o.text !== undefined && !o.text && !o.amtFirst ? $("f-text") : $("f-amt")).focus(), 260);
 }
 $("f-cancel").onclick = closeSheets;
 $("f-text").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("f-amt").focus(); } });
@@ -628,8 +633,18 @@ $("f-save").onclick = () => {
   const text = $("f-text").value.trim();
   if (!amt) return $("f-amt").focus();
   if (fm.text !== undefined && fm.needText && !text) return $("f-text").focus();
-  const f = fm; closeSheets(); f.done(amt, text);
+  const f = fm; closeSheets(); f.done(amt, text, f.chip);
 };
+function drawFormChips() {
+  const c = fm && fm.chips;
+  $("f-chips").style.display = c ? "" : "none";
+  if (c) $("f-chips").innerHTML = c.map(x => `<span class="${x.key === fm.chip ? "on" : ""}" data-fchip="${x.key}">${x.label}</span>`).join("");
+}
+$("f-chips").onclick = e => {
+  const t = e.target.closest("[data-fchip]"); if (!t || !fm) return;
+  fm.chip = t.dataset.fchip; if (fm.onChip) fm.onChip(fm.chip); drawFormChips();
+};
+$("f-del").onclick = () => { const f = fm; closeSheets(); if (f && f.onDel) f.onDel(); };
 
 $("s-budget-row").onclick = () => openForm({ title: "這期可花預算", amt: D.budget, done: amt => {
   const before = D.budget; D.budget = amt; renderAll(); enqueue({ action: "setBudget", payload: { amt } });
@@ -639,21 +654,38 @@ $("s-fixed-add").onclick = () => openForm({ title: "新增固定支出", text: "
   D.fixed.push({ item, amt }); renderAll(); enqueue({ action: "addFixed", payload: { item, amt } });
   toast("已新增固定支出 " + item + " " + money(amt), () => { const i = D.fixed.findIndex(f => f.item === item && f.amt === amt); if (i >= 0) D.fixed.splice(i, 1); renderAll(); enqueue({ action: "removeFixed", payload: { item, amt } }); });
 } });
-function savingForm(kind) {
-  openForm({ title: kind === "withdraw" ? "從儲蓄提領" : "存進儲蓄", text: "", textPh: "備註（可不填）", ok: kind === "withdraw" ? "提領" : "存入", done: (amt, note) => {
-    const v = kind === "withdraw" ? -amt : amt;
-    const s = { id: tmp--, date: todayKey(), amt: v, note };
-    D.savings.total += v; D.savings.list.unshift(s); renderAll();
-    enqueue({ action: "saving", tmp: s.id, payload: { kind, amt, note } });
-    undoState = { id: s.id };
-    toast((kind === "withdraw" ? "已提領 " : "已存入 ") + money(amt) + "，總存款 " + money(D.savings.total), () => {
-      const id = undoState.id; D.savings.total -= v; D.savings.list = D.savings.list.filter(x => x.id !== id && x.id !== s.id); renderAll();
-      enqueue({ action: "removeSaving", payload: { id } });
-    });
-  } });
+/* 每月存款：一個月一筆，再記一次就是改 */
+const monKey = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+const monLabel = k => { const [y, m] = k.split("-"); return y + " 年 " + Number(m) + " 月"; };
+function monthForm(month) {
+  const now = new Date();
+  const keys = [0, 1, 2, 3, 4, 5].map(i => monKey(new Date(now.getFullYear(), now.getMonth() - i, 1)));
+  if (month && !keys.includes(month)) keys.push(month);
+  const find = k => (D.monthly || []).find(m => m.month === k);
+  const start = month || keys[0], cur = find(start);
+  openForm({
+    title: "存進儲蓄帳戶", ok: "記下來", amtFirst: true, text: cur ? cur.note : "", textPh: "備註（可不填）", amt: cur ? cur.amt : "",
+    chips: keys.map((k, i) => ({ key: k, label: i === 0 ? "這個月" : i === 1 ? "上個月" : Number(k.split("-")[1]) + " 月" })), chip: start,
+    onChip: k => { const m = find(k); $("f-amt").value = m ? m.amt : ""; $("f-text").value = m ? m.note : ""; $("f-del").style.display = m ? "block" : "none"; fm.onDel = m ? () => delMonth(k) : null; },
+    onDel: cur ? () => delMonth(start) : null,
+    done: (amt, note, k) => {
+      D.monthly = D.monthly || [];
+      const before = find(k) ? Object.assign({}, find(k)) : null;
+      D.monthly = D.monthly.filter(m => m.month !== k).concat([{ month: k, amt, note }]).sort((a, b) => a.month < b.month ? 1 : -1);
+      renderAll(); enqueue({ action: "setMonthly", payload: { month: k, amt, note } });
+      toast(monLabel(k) + "存了 " + money(amt), () => {
+        D.monthly = D.monthly.filter(m => m.month !== k).concat(before ? [before] : []).sort((a, b) => a.month < b.month ? 1 : -1); renderAll();
+        enqueue(before ? { action: "setMonthly", payload: before } : { action: "removeMonthly", payload: { month: k } });
+      });
+    }
+  });
 }
-$("s-dep").onclick = () => savingForm("deposit");
-$("s-wd").onclick = () => savingForm("withdraw");
+function delMonth(k) {
+  const m = (D.monthly || []).find(x => x.month === k); if (!m) return;
+  D.monthly = D.monthly.filter(x => x !== m); renderAll(); enqueue({ action: "removeMonthly", payload: { month: k } });
+  toast("已刪除" + monLabel(k) + "的存款", () => { D.monthly = D.monthly.concat([m]).sort((a, b) => a.month < b.month ? 1 : -1); renderAll(); enqueue({ action: "setMonthly", payload: m }); });
+}
+$("s-mon-add").onclick = () => monthForm();
 $("s-end").onclick = () => {
   if (!D.entries.some(e => !isFuture(e.date))) return toast("這期還沒有任何紀錄，不用結束");
   const saved = JSON.parse(JSON.stringify(D));
@@ -680,15 +712,7 @@ $("app").addEventListener("click", e => {
     D.fixed.splice(i, 1); renderAll(); enqueue({ action: "removeFixed", payload: { item: fobj.item, amt: fobj.amt } });
     return toast("已刪除固定支出 " + fobj.item, () => { D.fixed.splice(i, 0, fobj); renderAll(); enqueue({ action: "addFixed", payload: fobj }); });
   }
-  const sv = t.closest("[data-sav]"); if (sv) {
-    const s = D.savings.list.find(x => x.id === Number(sv.dataset.sav)); if (!s || s.id < 0) return;
-    D.savings.list = D.savings.list.filter(x => x !== s); D.savings.total -= s.amt; renderAll();
-    enqueue({ action: "removeSaving", payload: { id: s.id } });
-    return toast("已刪除這筆" + (s.amt < 0 ? "提領" : "存入") + " " + money(Math.abs(s.amt)), () => {
-      const back = Object.assign({}, s, { id: tmp-- }); D.savings.list.unshift(back); D.savings.total += s.amt; renderAll();
-      enqueue({ action: "saving", tmp: back.id, payload: { kind: s.amt < 0 ? "withdraw" : "deposit", amt: Math.abs(s.amt), note: s.note } });
-    });
-  }
+  const mo = t.closest("[data-mon]"); if (mo) return monthForm(mo.dataset.mon);
   const rv = t.closest("[data-rev]"); if (rv) { reviewIdx = Number(rv.dataset.rev); return renderReview(); }
   if (t.closest("#bunny")) return bunnyTalk();
 });
