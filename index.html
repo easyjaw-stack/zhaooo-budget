@@ -69,9 +69,17 @@
   .chips span { font-size: 12px; padding: 6px 12px; border-radius: 99px; background: var(--card); box-shadow: inset 0 0 0 1px var(--frame); color: var(--sub); cursor: pointer; user-select: none; -webkit-user-select: none; transition: transform .12s var(--ease); }
   .chips span:active { transform: scale(.94); }
   .chips span.on { background: var(--ink); color: #fff; box-shadow: none; }
-  /* 選日期：透明的日期欄直接蓋在膠囊上，手機點下去就是系統的日期選單 */
-  .chips .pick { position: relative; overflow: hidden; }
-  .chips .pick input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; font-size: 16px; border: 0; cursor: pointer; -webkit-appearance: none; appearance: none; }
+  /* 選日期的小月曆 */
+  .cal { background: var(--bg); border-radius: 12px; padding: 10px; margin-top: 10px; }
+  .cal-h { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .cal-h span { width: 36px; height: 30px; display: grid; place-items: center; color: var(--sub); font-size: 18px; font-weight: 400; cursor: pointer; border-radius: 8px; }
+  .cal-h span.off { opacity: .25; pointer-events: none; }
+  .cal-g { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+  .cal-g b { font-size: 10px; color: var(--sub); font-weight: 400; padding: 2px 0; }
+  .cal-g i { font-style: normal; font-size: 14px; padding: 7px 0; border-radius: 8px; cursor: pointer; }
+  .cal-g i.today { box-shadow: inset 0 0 0 1px var(--frame); }
+  .cal-g i.on { background: var(--ink); color: #fff; box-shadow: none; }
+  .cal-g i.fut { color: var(--faint2); pointer-events: none; }
   .chips .lab { background: none; box-shadow: none; padding-left: 0; cursor: default; }
   .scroll-chips { flex-wrap: nowrap; overflow-x: auto; margin: 0 2px 6px; scrollbar-width: none; }
   .scroll-chips::-webkit-scrollbar { display: none; }
@@ -223,6 +231,7 @@
       <button class="btn ghost" style="margin:0" id="s-end">結束這一期，開始新的一期</button>
       <div style="font-size:11px;color:var(--sub);text-align:center;margin-top:8px;line-height:1.6" id="s-end-note"></div>
     </div>
+    <div style="font-size:11px;color:var(--faint);text-align:center;margin:4px 0 8px" id="s-ver"></div>
   </div>
 
   <div class="toast" id="toast"><span id="toast-t"></span><b id="toast-undo">復原</b></div>
@@ -248,6 +257,7 @@
     <div class="chips" id="sh-cats"></div>
     <div class="lbl" style="margin-top:10px">日期</div>
     <div class="chips" id="sh-days"></div>
+    <div class="cal" id="sh-cal" style="display:none"></div>
     <div class="keys num" id="sh-keys"></div>
     <button class="btn" id="sh-save">記下來</button>
     <button class="btn danger" id="sh-del" style="display:none">刪除這筆</button>
@@ -272,7 +282,7 @@
 </div>
 
 <script>
-const VER=/*VER*/'20261123144352';
+const VER=/*VER*/'20261123144748';
 const API = "https://script.google.com/macros/s/AKfycbwHtmJ9G5ySWGqCqw52DluNFGaHKyvuKEqg1At8jhcn5VYTHLEwAHIi6HSkVeJCU9czbA/exec";
 const CATS = ["飲食", "居家", "交通", "購物", "娛樂", "健康", "軟體", "其他"];
 const KW = {
@@ -300,7 +310,6 @@ const todayKey = () => { const d = new Date(); return d.getFullYear() + "-" + (d
 const parseKey = k => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
 const dayKey = d => d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
 const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
-const isoDate = k => { const [y, m, d] = k.split("-"); return y + "-" + m.padStart(2, "0") + "-" + d.padStart(2, "0"); };
 const md = k => { const [, m, d] = k.split("-"); return m + "/" + d; };
 function guess(item) {
   const t = (item || "").trim(); if (!t) return null;
@@ -466,6 +475,7 @@ function renderSet() {
   $("s-sav-list").innerHTML = D.savings.list.slice(0, 5).map(s =>
     `<div class="item" data-sav="${s.id}"><div class="n">${s.amt < 0 ? "提領" : "存入"}${s.note ? `<small>${esc(s.note)}</small>` : ""}</div><div class="num" style="color:var(--sub)">${s.date ? md(s.date) : ""}</div><div class="num">${money(s.amt)}</div></div>`).join("");
   $("s-end-note").innerHTML = "明細會收進「回顧」，預算設回 " + money(D.defaultBudget || 35000) + "。<br>按錯了下面會出現「復原」。";
+  $("s-ver").textContent = "版本 " + (VER === "dev" ? "開發中" : VER.slice(4, 8).replace(/(\d\d)(\d\d)/, "$1/$2") + " " + VER.slice(8, 12).replace(/(\d\d)(\d\d)/, "$1:$2"));
 }
 
 function renderAll() { if (!D) return; renderHome(); renderList(); renderReview(); renderSet(); showSync(); }
@@ -491,7 +501,7 @@ function flash(id) { flashId = id; setTimeout(() => { if (flashId === id) flashI
 let sh = null;
 function openSheet(opts) {
   if (!D) return;
-  sh = Object.assign({ amt: "", item: "", note: "", cat: null, catTouched: false, date: todayKey(), id: null }, opts);
+  sh = Object.assign({ amt: "", item: "", note: "", cat: null, catTouched: false, date: todayKey(), id: null, picking: false, calMonth: null }, opts);
   $("sh-title").textContent = sh.id ? "改這筆" : "記一筆";
   $("sh-save").textContent = sh.id ? "改好了" : "記下來";
   $("sh-del").style.display = sh.id ? "block" : "none";
@@ -514,7 +524,8 @@ function drawSheet() {
   const near = [0, 1, 2].map(i => dayKey(addDays(new Date(), -i)));
   const other = !near.includes(sh.date);
   $("sh-days").innerHTML = ["今天", "昨天", "前天"].map((d, i) => `<span class="${near[i] === sh.date ? "on" : ""}" data-shday="${near[i]}">${d}</span>`).join("")
-    + `<span class="pick${other ? " on" : ""}">${other ? fmtDay(sh.date) : "選日期"}<input type="date" id="sh-date" value="${isoDate(sh.date)}" max="${isoDate(todayKey())}"></span>`;
+    + `<span class="${other || sh.picking ? "on" : ""}" data-shday="pick">${other ? fmtDay(sh.date) : "選日期"}</span>`;
+  drawCal();
   $("sh-save").disabled = !Number(sh.amt);
 }
 $("sh-keys").innerHTML = ["1","2","3","4","5","6","7","8","9","00","0","⌫"].map(k => `<span data-key="${k}">${k}</span>`).join("");
@@ -529,14 +540,32 @@ $("sh-note").oninput = e => { sh.note = e.target.value; };
 $("sh-cats").onclick = e => { const t = e.target.closest("[data-shcat]"); if (!t) return; sh.cat = t.dataset.shcat; sh.catTouched = true; drawSheet(); };
 $("sh-days").onclick = e => {
   const t = e.target.closest("[data-shday]"); if (!t) return;
-  sh.date = t.dataset.shday; drawSheet();
+  if (t.dataset.shday === "pick") {
+    sh.picking = !sh.picking;
+    const d = parseKey(sh.date); sh.calMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+  } else { sh.date = t.dataset.shday; sh.picking = false; }
+  drawSheet();
 };
-$("sh-days").addEventListener("change", e => {
-  if (e.target.id !== "sh-date" || !e.target.value || !sh) return;
-  const [y, m, d] = e.target.value.split("-").map(Number); sh.date = dayKey(new Date(y, m - 1, d)); drawSheet();
-});
-// 電腦的 Chrome 點透明欄不一定會開日曆，補一個 showPicker
-$("sh-days").addEventListener("click", e => { if (e.target.id === "sh-date" && e.target.showPicker && !/iPhone|iPad|Android/.test(navigator.userAgent)) { try { e.target.showPicker(); } catch (_) {} } });
+function drawCal() {
+  const box = $("sh-cal");
+  box.style.display = sh.picking ? "" : "none";
+  $("sh-keys").style.display = sh.picking ? "none" : "";
+  if (!sh.picking) return;
+  const m = sh.calMonth, today = parseKey(todayKey());
+  const first = new Date(m.getFullYear(), m.getMonth(), 1), days = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
+  const lead = (first.getDay() + 6) % 7; // 星期一開頭
+  const canNext = new Date(m.getFullYear(), m.getMonth() + 1, 1) <= today;
+  let g = "一二三四五六日".split("").map(w => `<b>${w}</b>`).join("") + "<i style='pointer-events:none'></i>".repeat(lead);
+  for (let d = 1; d <= days; d++) {
+    const dt = new Date(m.getFullYear(), m.getMonth(), d), k = dayKey(dt);
+    g += `<i class="${k === sh.date ? "on" : ""}${dt > today ? " fut" : ""}${k === todayKey() ? " today" : ""}" data-calday="${k}">${d}</i>`;
+  }
+  box.innerHTML = `<div class="cal-h"><span data-calnav="-1">‹</span>${m.getFullYear()} 年 ${m.getMonth() + 1} 月<span data-calnav="1" class="${canNext ? "" : "off"}">›</span></div><div class="cal-g num">${g}</div>`;
+}
+$("sh-cal").onclick = e => {
+  const n = e.target.closest("[data-calnav]"); if (n) { sh.calMonth = new Date(sh.calMonth.getFullYear(), sh.calMonth.getMonth() + Number(n.dataset.calnav), 1); return drawCal(); }
+  const d = e.target.closest("[data-calday]"); if (d) { sh.date = d.dataset.calday; sh.picking = false; drawSheet(); }
+};
 $("sh-cancel").onclick = closeSheets; $("dim").onclick = closeSheets;
 [$("sh-item"), $("sh-note")].forEach(el => el.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); el.blur(); } }));
 
@@ -701,7 +730,7 @@ $("login-in").addEventListener("keydown", e => { if (e.key === "Enter") $("login
 /* ---------- 新版自動更新 ---------- */
 async function checkVer() {
   if (VER === "dev" || queue.length || sh || fm) return;
-  try { const t = await (await fetch("./?v=" + Date.now(), { cache: "no-store" })).text(); const m = t.match(/\/\*VER\*\/'(\w+)'/); if (m && m[1] !== VER) location.reload(); } catch (e) {}
+  try { const t = await (await fetch("./?v=" + Date.now(), { cache: "no-store" })).text(); const m = t.match(/\/\*VER\*\/'(\w+)'/); if (m && m[1] !== VER) location.replace("./?v=" + m[1]); } catch (e) {}
 }
 
 /* ---------- 開始 ---------- */
@@ -709,6 +738,7 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 window.addEventListener("online", flush);
 if (!KEY) showLogin();
 else { if (D) renderAll(); flush(); refresh(); }
+checkVer();
 </script>
 </body>
 </html>
