@@ -79,7 +79,6 @@
   .cal-g i { font-style: normal; font-size: 14px; padding: 7px 0; border-radius: 8px; cursor: pointer; }
   .cal-g i.today { box-shadow: inset 0 0 0 1px var(--frame); }
   .cal-g i.on { background: var(--ink); color: #fff; box-shadow: none; }
-  .cal-g i.fut { color: var(--faint2); pointer-events: none; }
   .chips .lab { background: none; box-shadow: none; padding-left: 0; cursor: default; }
   .scroll-chips { flex-wrap: nowrap; overflow-x: auto; margin: 0 2px 6px; scrollbar-width: none; }
   .scroll-chips::-webkit-scrollbar { display: none; }
@@ -282,7 +281,7 @@
 </div>
 
 <script>
-const VER=/*VER*/'20261123144748';
+const VER=/*VER*/'20261123145154';
 const API = "https://script.google.com/macros/s/AKfycbwHtmJ9G5ySWGqCqw52DluNFGaHKyvuKEqg1At8jhcn5VYTHLEwAHIi6HSkVeJCU9czbA/exec";
 const CATS = ["飲食", "居家", "交通", "購物", "娛樂", "健康", "軟體", "其他"];
 const KW = {
@@ -321,7 +320,7 @@ function guess(item) {
 function fmtDay(k) {
   const dt = parseKey(k); const diff = Math.round((parseKey(todayKey()) - dt) / 864e5);
   const base = md(k) + "（" + WEEK[dt.getDay()] + "）";
-  return diff === 0 ? "今天 " + base : diff === 1 ? "昨天 " + base : base;
+  return diff === 0 ? "今天 " + base : diff === 1 ? "昨天 " + base : diff === -1 ? "明天 " + base : base;
 }
 
 /* ---------- 跟試算表溝通 ---------- */
@@ -396,8 +395,9 @@ function calc() {
 function catTotals(list) { const t = {}; list.forEach(e => t[e.cat] = (t[e.cat] || 0) + e.amt); return t; }
 
 /* ---------- 畫面 ---------- */
+const isFuture = k => parseKey(k) > parseKey(todayKey());
 function itemHTML(e, sub) {
-  const small = [e.cat, sub].filter(Boolean).join(" · ");
+  const small = [e.cat, isFuture(e.date) ? "預先記" : "", sub].filter(Boolean).join(" · ");
   return `<div class="item${e.id === flashId ? " flash" : ""}${e.id < 0 ? " pending" : ""}" data-id="${e.id}"><div class="n">${esc(e.item)}<small>${esc(small)}</small></div><div class="num">${money(e.amt)}</div></div>`;
 }
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -430,7 +430,7 @@ function renderHome() {
   $("h-recent").innerHTML = recent.length ? recent.map(e => itemHTML(e, shortDay(e.date))).join("") : `<div class="empty">按下面的＋開始記第一筆</div>`;
 }
 function sortKey(e) { return e.id < 0 ? 9e15 - e.id : e.id; }
-function shortDay(k) { const f = fmtDay(k); return f.startsWith("今天") ? "今天" : f.startsWith("昨天") ? "昨天" : md(k); }
+function shortDay(k) { const f = fmtDay(k); return f.startsWith("今天") ? "今天" : f.startsWith("昨天") ? "昨天" : f.startsWith("明天") ? "明天" : md(k); }
 
 function renderList() {
   $("l-sub").textContent = md(D.period.start) + " – " + md(D.period.end);
@@ -554,11 +554,11 @@ function drawCal() {
   const m = sh.calMonth, today = parseKey(todayKey());
   const first = new Date(m.getFullYear(), m.getMonth(), 1), days = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
   const lead = (first.getDay() + 6) % 7; // 星期一開頭
-  const canNext = new Date(m.getFullYear(), m.getMonth() + 1, 1) <= today;
+  const canNext = new Date(m.getFullYear(), m.getMonth() + 1, 1) <= addDays(today, 366);
   let g = "一二三四五六日".split("").map(w => `<b>${w}</b>`).join("") + "<i style='pointer-events:none'></i>".repeat(lead);
   for (let d = 1; d <= days; d++) {
     const dt = new Date(m.getFullYear(), m.getMonth(), d), k = dayKey(dt);
-    g += `<i class="${k === sh.date ? "on" : ""}${dt > today ? " fut" : ""}${k === todayKey() ? " today" : ""}" data-calday="${k}">${d}</i>`;
+    g += `<i class="${k === sh.date ? "on" : ""}${k === todayKey() ? " today" : ""}" data-calday="${k}">${d}</i>`;
   }
   box.innerHTML = `<div class="cal-h"><span data-calnav="-1">‹</span>${m.getFullYear()} 年 ${m.getMonth() + 1} 月<span data-calnav="1" class="${canNext ? "" : "off"}">›</span></div><div class="cal-g num">${g}</div>`;
 }
@@ -655,9 +655,10 @@ function savingForm(kind) {
 $("s-dep").onclick = () => savingForm("deposit");
 $("s-wd").onclick = () => savingForm("withdraw");
 $("s-end").onclick = () => {
-  if (!D.entries.length) return toast("這期還沒有任何紀錄，不用結束");
+  if (!D.entries.some(e => !isFuture(e.date))) return toast("這期還沒有任何紀錄，不用結束");
   const saved = JSON.parse(JSON.stringify(D));
-  D.entries = []; D.budget = D.defaultBudget || 35000; renderAll(); go("home");
+  // 預先記的自動扣款留到新的一期
+  D.entries = D.entries.filter(e => isFuture(e.date)); D.budget = D.defaultBudget || 35000; renderAll(); go("home");
   enqueue({ action: "endPeriod" });
   toast("新的一期開始了，預算 " + money(D.budget), () => { D = saved; renderAll(); enqueue({ action: "undoEnd" }); }, 12000);
 };
