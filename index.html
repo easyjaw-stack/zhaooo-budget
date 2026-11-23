@@ -222,7 +222,6 @@
     </div>
     <div class="panel" style="padding:0 14px">
       <div class="cap" style="margin:12px 0 0">每月存進儲蓄帳戶</div>
-      <div class="set"><span>累計存了</span><span class="num" style="color:var(--ink);font-weight:600" id="s-mon-total"></span></div>
       <div id="s-mon-list"></div>
       <div class="set tap" id="s-mon-add"><span style="color:var(--sub)">＋ 記錄這個月存了多少</span><span></span></div>
     </div>
@@ -283,7 +282,7 @@
 </div>
 
 <script>
-const VER=/*VER*/'20261124013717';
+const VER=/*VER*/'20261124013823';
 const API = "https://script.google.com/macros/s/AKfycbwHtmJ9G5ySWGqCqw52DluNFGaHKyvuKEqg1At8jhcn5VYTHLEwAHIi6HSkVeJCU9czbA/exec";
 const CATS = ["飲食", "居家", "交通", "購物", "娛樂", "健康", "軟體", "其他"];
 const KW = {
@@ -474,7 +473,6 @@ function renderSet() {
   $("s-budget").textContent = money(D.budget);
   $("s-fixed").innerHTML = D.fixed.map((f, i) => `<div class="set tap" data-fixed="${i}"><span>${esc(f.item)}</span><span class="num">${money(f.amt)}</span></div>`).join("");
   const mon = D.monthly || [];
-  $("s-mon-total").textContent = money(mon.reduce((t, m) => t + m.amt, 0));
   $("s-mon-list").innerHTML = mon.map(m =>
     `<div class="set tap" data-mon="${m.month}"><span>${monLabel(m.month)}${m.note ? `<small style="color:var(--sub);margin-left:6px">${esc(m.note)}</small>` : ""}</span><span class="num">${money(m.amt)}</span></div>`).join("");
   $("s-end-note").innerHTML = "明細會收進「回顧」，預算設回 " + money(D.defaultBudget || 35000) + "。<br>按錯了下面會出現「復原」。";
