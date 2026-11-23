@@ -1,0 +1,707 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="記帳">
+<meta name="theme-color" content="#F2F1EE">
+<meta name="robots" content="noindex, nofollow">
+<title>記帳</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="favicon.png">
+<style>
+  :root {
+    --bg: #F2F1EE; --card: #FFFFFF; --ink: #262624; --sub: #9B9993; --faint: #B8B8B4; --faint2: #C9C7C0;
+    --line: #E6E4DF; --frame: #D3D1C7; --red: #B5584E; --flash: #FFF6DE;
+    --ease: cubic-bezier(.2,.8,.2,1); --pop: cubic-bezier(.3,1.6,.5,1);
+    --top: env(safe-area-inset-top, 0px); --bot: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overscroll-behavior: none; }
+  body { font-family: -apple-system, "PingFang TC", "Noto Sans TC", sans-serif; background: #E9E8E4; color: var(--ink); font-size: 13px; display: flex; align-items: center; justify-content: center; -webkit-text-size-adjust: 100%; }
+  .num { font-variant-numeric: tabular-nums; }
+  #app { width: 390px; height: min(844px, 100vh); border-radius: 46px; border: 10px solid #262624; overflow: hidden; position: relative; background: var(--bg); }
+  @media (max-width: 600px) { body { display: block; background: var(--bg); } #app { width: 100%; height: 100%; border: 0; border-radius: 0; } }
+
+  .page { position: absolute; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: calc(var(--top) + 18px) 12px calc(var(--bot) + 100px); display: none; }
+  @media (min-width: 601px) { .page { padding-top: 46px; } }
+  .page.on { display: block; animation: fade .18s var(--ease); }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .head { display: flex; justify-content: space-between; align-items: flex-end; margin: 0 2px 10px; }
+  .head .t { font-size: 16px; font-weight: 600; }
+  .head .s { font-size: 11px; color: var(--sub); }
+  .panel { background: var(--card); border-radius: 14px; padding: 12px 14px; margin-bottom: 12px; }
+  .cap { font-size: 11px; color: var(--sub); display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .cap a { color: var(--sub); cursor: pointer; }
+  .big { font-size: 32px; font-weight: 600; letter-spacing: -.5px; }
+  .big small { font-size: 13px; color: var(--sub); font-weight: 400; margin-left: 4px; }
+  .big.neg { color: var(--red); }
+  .track { height: 6px; background: var(--bg); border-radius: 99px; margin: 10px 0 8px; overflow: hidden; }
+  .track i { display: block; height: 100%; background: var(--ink); border-radius: 99px; transition: width .3s var(--ease); max-width: 100%; }
+  .kv { display: flex; justify-content: space-between; font-size: 12px; color: var(--sub); }
+  .kv b { color: var(--ink); font-weight: 500; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; }
+  .stats div { text-align: center; }
+  .stats div + div { border-left: 1px solid var(--line); }
+  .stats b { display: block; font-size: 16px; font-weight: 600; }
+  .stats span { font-size: 11px; color: var(--sub); }
+  .cat { display: flex; align-items: center; gap: 8px; padding: 7px 0; font-size: 12px; border-radius: 8px; }
+  [data-cat-go] { cursor: pointer; } [data-cat-go]:active { background: var(--bg); }
+  .cat .n { width: 34px; }
+  .cat .bar { flex: 1; height: 5px; background: var(--bg); border-radius: 99px; overflow: hidden; }
+  .cat .bar i { display: block; height: 100%; border-radius: 99px; background: var(--ink); transition: width .3s var(--ease); }
+  .cat .m { width: 64px; text-align: right; }
+  .diff { font-size: 11px; width: 58px; text-align: right; color: var(--sub); }
+  .item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; margin: 0 -14px; font-size: 13px; cursor: pointer; transition: background 1.2s ease; }
+  .item + .item { border-top: 1px solid var(--line); }
+  .item .n { flex: 1; min-width: 0; }
+  .item .n small { display: block; font-size: 11px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item.flash { background: var(--flash); transition: none; }
+  .item.pending .num::after { content: " ·"; color: var(--faint); }
+  .ledger { background: var(--card); border-radius: 14px; padding: 0 14px; margin-bottom: 4px; }
+  .day { font-size: 11px; color: var(--sub); display: flex; justify-content: space-between; padding: 10px 2px 4px; }
+  .empty { color: var(--sub); font-size: 12px; text-align: center; padding: 22px 0; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chips span { font-size: 12px; padding: 6px 12px; border-radius: 99px; background: var(--card); box-shadow: inset 0 0 0 1px var(--frame); color: var(--sub); cursor: pointer; user-select: none; -webkit-user-select: none; transition: transform .12s var(--ease); }
+  .chips span:active { transform: scale(.94); }
+  .chips span.on { background: var(--ink); color: #fff; box-shadow: none; }
+  .chips .lab { background: none; box-shadow: none; padding-left: 0; cursor: default; }
+  .scroll-chips { flex-wrap: nowrap; overflow-x: auto; margin: 0 2px 6px; scrollbar-width: none; }
+  .scroll-chips::-webkit-scrollbar { display: none; }
+  .scroll-chips span { flex: none; }
+  .bunny-wrap { position: relative; }
+  .bunny { width: 20px; height: 20px; stroke: var(--sub); fill: none; stroke-width: 1.4; stroke-linecap: round; cursor: pointer; display: block; }
+  .bunny.wig { animation: wig .5s var(--pop); }
+  @keyframes wig { 0%,100% { transform: rotate(0); } 30% { transform: rotate(-14deg); } 60% { transform: rotate(10deg); } }
+  .bubble { position: absolute; right: -4px; bottom: 30px; background: var(--ink); color: #fff; font-size: 11px; padding: 6px 10px; border-radius: 10px; white-space: nowrap; opacity: 0; transform: translateY(4px) scale(.96); transform-origin: right bottom; pointer-events: none; transition: all .18s var(--ease); }
+  .bubble::after { content: ""; position: absolute; right: 10px; bottom: -4px; width: 8px; height: 8px; background: var(--ink); transform: rotate(45deg); }
+  .bubble.on { opacity: 1; transform: none; transition: all .24s var(--pop); }
+  .sync { font-size: 11px; color: var(--sub); text-align: center; margin: 4px 0 10px; min-height: 14px; }
+
+  .nav { position: absolute; left: 0; right: 0; bottom: 0; padding: 9px 0 calc(var(--bot) + 10px); background: var(--card); border-top: 1px solid var(--line); display: flex; justify-content: space-around; align-items: flex-start; font-size: 10px; color: var(--sub); z-index: 5; }
+  @media (min-width: 601px) { .nav { padding-bottom: 22px; } }
+  .nav div { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 56px; cursor: pointer; }
+  .nav div.on { color: var(--ink); font-weight: 600; }
+  .nav svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .nav .add { width: 48px; height: 46px; border-radius: 12px; background: var(--ink); color: #fff; justify-content: center; margin-top: -2px; transition: transform .15s var(--ease); }
+  .nav .add:active { transform: scale(.92); }
+
+  .dim { position: absolute; inset: 0; background: rgba(38,38,36,.28); z-index: 8; opacity: 0; pointer-events: none; transition: opacity .2s var(--ease); }
+  .dim.on { opacity: 1; pointer-events: auto; }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--card); border-radius: 18px 18px 0 0; padding: 8px 16px calc(var(--bot) + 22px); z-index: 9; transform: translateY(105%); transition: transform .24s var(--ease); max-height: 92%; overflow-y: auto; }
+  .sheet.on { transform: none; }
+  .grab { width: 36px; height: 4px; border-radius: 99px; background: var(--line); margin: 0 auto 12px; }
+  .ttl { font-size: 15px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .ttl span { font-size: 13px; font-weight: 400; color: var(--sub); cursor: pointer; padding: 4px; }
+  .field { background: var(--bg); border-radius: 10px; padding: 9px 12px; margin-bottom: 10px; font-size: 14px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .field.focus { background: #fff; box-shadow: inset 0 0 0 1.5px var(--ink); }
+  .field small { font-size: 11px; color: var(--sub); flex: none; }
+  .field .amt { font-size: 26px; font-weight: 600; }
+  .field input { border: 0; background: none; font: inherit; font-size: 16px; flex: 1; outline: none; color: var(--ink); min-width: 0; }
+  .field input.amt-in { font-size: 24px; font-weight: 600; text-align: right; }
+  .caret { display: inline-block; width: 1.5px; height: 22px; background: var(--ink); vertical-align: -3px; margin-left: 2px; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .lbl { font-size: 11px; color: var(--sub); margin: 2px 0 6px; }
+  .btn { display: block; width: 100%; border: 0; text-align: center; border-radius: 10px; padding: 12px; font: inherit; font-size: 14px; font-weight: 600; background: var(--ink); color: #fff; margin-top: 12px; cursor: pointer; }
+  .btn:disabled { background: var(--faint2); }
+  .btn.ghost { background: var(--bg); color: var(--ink); font-weight: 500; }
+  .btn.danger { background: none; color: var(--red); font-weight: 500; margin-top: 2px; padding: 8px; }
+  .row2 { display: flex; gap: 8px; } .row2 .btn { margin-top: 0; }
+  .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }
+  .keys span { background: var(--bg); border-radius: 9px; text-align: center; padding: 11px 0; font-size: 18px; cursor: pointer; user-select: none; -webkit-user-select: none; }
+  .keys span:active { background: var(--line); }
+
+  .toast { position: absolute; left: 12px; right: 12px; bottom: calc(var(--bot) + 92px); background: var(--ink); color: #fff; border-radius: 10px; padding: 12px 14px; font-size: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; z-index: 7; transform: translateY(20px); opacity: 0; pointer-events: none; transition: all .2s var(--ease); }
+  .toast.on { transform: none; opacity: 1; pointer-events: auto; }
+  .toast b { font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; flex: none; }
+
+  .seg { display: flex; background: var(--card); border-radius: 10px; padding: 3px; margin-bottom: 12px; }
+  .seg span { flex: 1; text-align: center; font-size: 12px; padding: 7px 0; border-radius: 8px; color: var(--sub); cursor: pointer; }
+  .seg span.on { background: var(--ink); color: #fff; }
+  .bars { display: flex; align-items: flex-end; gap: 8px; height: 130px; padding: 0 2px; }
+  .bars .b { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; font-size: 10px; color: var(--sub); cursor: pointer; }
+  .bars .b i { width: 100%; border-radius: 6px 6px 3px 3px; background: var(--faint2); display: block; margin: 3px 0; min-height: 2px; }
+  .bars .b.over i { background: #E8C9C4; }
+  .bars .b.cur i { background: var(--ink); }
+  .set { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; font-size: 13px; }
+  .set + .set { border-top: 1px solid var(--line); }
+  .set > span:last-child { color: var(--sub); }
+  .set.tap { cursor: pointer; }
+  .set.tap > span:last-child::after { content: " ›"; }
+
+  .login { position: absolute; inset: 0; background: var(--bg); z-index: 20; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 30px; gap: 14px; }
+  .login.on { display: flex; }
+  .login img { width: 72px; height: 72px; border-radius: 18px; }
+  .login .field { width: 100%; max-width: 260px; }
+  .login input { text-align: center; letter-spacing: 6px; font-size: 22px; }
+  .login p { color: var(--sub); font-size: 12px; text-align: center; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div id="app">
+  <svg width="0" height="0" style="position:absolute">
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M5 12l-2 0l9-9l9 9l-2 0"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/><path d="M10 21v-6h4v6"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M5 6v.01M5 12v.01M5 18v.01"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M6 17v-5M11 17v-9M16 17v-3M20 17v-7"/></symbol>
+    <symbol id="i-set" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37c1 .608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></symbol>
+  </svg>
+
+  <!-- 總覽 -->
+  <div class="page on" id="p-home">
+    <div class="head"><div><div class="s num" id="h-sub"></div><div class="t">還可以花</div></div>
+      <div class="bunny-wrap"><div class="bubble" id="bubble"></div><svg class="bunny" id="bunny" viewBox="0 0 24 24"><path d="M9 9c-1-3-1-6 0-6.5s2 2.5 2 6M15 9c1-3 1-6 0-6.5s-2 2.5-2 6"/><circle cx="12" cy="15" r="6"/><path d="M10 14.5v.01M14 14.5v.01M11 17q1 .8 2 0"/></svg></div></div>
+    <div class="panel">
+      <div class="big num" id="h-left">—</div>
+      <div class="track"><i id="h-bar" style="width:0"></i></div>
+      <div class="kv"><span>已花 <b class="num" id="h-spent">—</b></span></div>
+      <div class="stats num">
+        <div><b id="h-today">—</b><span>今天還能花</span></div>
+        <div><b id="h-days">—</b><span>天到存款日</span></div>
+      </div>
+    </div>
+    <div class="chips" id="h-quick" style="margin:-2px 2px 12px"></div>
+    <div class="panel">
+      <div class="cap"><span>支出分類</span><span>點一類看明細</span></div>
+      <div id="h-cats"></div>
+    </div>
+    <div class="panel">
+      <div class="cap"><span>最近記帳</span><a data-go="list">明細 ›</a></div>
+      <div id="h-recent"></div>
+    </div>
+    <div class="sync" id="sync"></div>
+  </div>
+
+  <!-- 明細 -->
+  <div class="page" id="p-list">
+    <div class="head"><div><div class="s num" id="l-sub"></div><div class="t">明細</div></div><div class="s num" id="l-sum"></div></div>
+    <div class="chips scroll-chips" id="l-filter"></div>
+    <div id="l-body"></div>
+  </div>
+
+  <!-- 回顧 -->
+  <div class="page" id="p-review">
+    <div class="head"><div><div class="s">每一期 15 號到 15 號</div><div class="t">回顧</div></div></div>
+    <div class="panel">
+      <div class="cap"><span>每期總花費</span><span>淡紅＝超過預算</span></div>
+      <div class="bars num" id="r-bars"></div>
+    </div>
+    <div class="seg" id="r-seg"></div>
+    <div class="panel">
+      <div class="cap"><span id="r-title"></span><span>比上一期</span></div>
+      <div id="r-cats"></div>
+    </div>
+  </div>
+
+  <!-- 設定 -->
+  <div class="page" id="p-set">
+    <div class="head"><div><div class="t">設定</div></div></div>
+    <div class="panel" style="padding:0 14px">
+      <div class="set tap" id="s-budget-row"><span>這期可花預算</span><span class="num" id="s-budget"></span></div>
+      <div class="set"><span>存款日</span><span>每月 15 號</span></div>
+    </div>
+    <div class="panel" style="padding:0 14px">
+      <div class="cap" style="margin:12px 0 0">固定支出（只顯示、不扣預算）</div>
+      <div id="s-fixed"></div>
+      <div class="set tap" id="s-fixed-add"><span style="color:var(--sub)">＋ 新增固定支出</span><span></span></div>
+    </div>
+    <div class="panel" style="padding:0 14px">
+      <div class="cap" style="margin:12px 0 0">儲蓄帳戶</div>
+      <div class="set"><span>總存款</span><span class="num" style="color:var(--ink);font-weight:600" id="s-sav-total"></span></div>
+      <div class="row2" style="padding:4px 0 12px"><button class="btn ghost" id="s-dep">存入</button><button class="btn ghost" id="s-wd">提領</button></div>
+      <div id="s-sav-list"></div>
+    </div>
+    <div class="panel">
+      <button class="btn ghost" style="margin:0" id="s-end">結束這一期，開始新的一期</button>
+      <div style="font-size:11px;color:var(--sub);text-align:center;margin-top:8px;line-height:1.6" id="s-end-note"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"><span id="toast-t"></span><b id="toast-undo">復原</b></div>
+
+  <div class="nav">
+    <div class="on" data-go="home"><svg><use href="#i-home"/></svg>總覽</div>
+    <div data-go="list"><svg><use href="#i-list"/></svg>明細</div>
+    <div class="add" id="nav-add"><svg><use href="#i-plus"/></svg></div>
+    <div data-go="review"><svg><use href="#i-chart"/></svg>回顧</div>
+    <div data-go="set"><svg><use href="#i-set"/></svg>設定</div>
+  </div>
+
+  <div class="dim" id="dim"></div>
+
+  <!-- 記一筆 -->
+  <div class="sheet" id="sheet">
+    <div class="grab"></div>
+    <div class="ttl"><b id="sh-title" style="font-weight:600">記一筆</b><span id="sh-cancel">取消</span></div>
+    <div class="field focus"><small>金額</small><span class="amt num"><span id="sh-amt">$0</span><i class="caret"></i></span></div>
+    <div class="field"><input id="sh-item" placeholder="項目，例如：午餐" autocomplete="off" enterkeyhint="done"></div>
+    <div class="field"><input id="sh-note" placeholder="備註（可不填）" autocomplete="off" enterkeyhint="done"></div>
+    <div class="lbl" id="sh-catlbl">分類</div>
+    <div class="chips" id="sh-cats"></div>
+    <div class="lbl" style="margin-top:10px">日期</div>
+    <div class="chips" id="sh-days"></div>
+    <input type="date" id="sh-date" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;left:0;bottom:0">
+    <div class="keys num" id="sh-keys"></div>
+    <button class="btn" id="sh-save">記下來</button>
+    <button class="btn danger" id="sh-del" style="display:none">刪除這筆</button>
+  </div>
+
+  <!-- 設定用的小表單 -->
+  <div class="sheet" id="form">
+    <div class="grab"></div>
+    <div class="ttl"><b id="f-title" style="font-weight:600"></b><span id="f-cancel">取消</span></div>
+    <div class="field" id="f-text-wrap"><input id="f-text" autocomplete="off" enterkeyhint="next"></div>
+    <div class="field focus"><small>金額</small><input id="f-amt" class="amt-in num" inputmode="numeric" pattern="[0-9]*" autocomplete="off" enterkeyhint="done"></div>
+    <button class="btn" id="f-save">好</button>
+  </div>
+
+  <div class="login" id="login">
+    <img src="apple-touch-icon.png" alt="">
+    <p>輸入記帳密碼</p>
+    <div class="field focus"><input id="login-in" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="off"></div>
+    <button class="btn" style="max-width:260px" id="login-go">進入</button>
+    <p id="login-msg"></p>
+  </div>
+</div>
+
+<script>
+const VER=/*VER*/'dev';
+const API = "https://script.google.com/macros/s/AKfycbwHtmJ9G5ySWGqCqw52DluNFGaHKyvuKEqg1At8jhcn5VYTHLEwAHIi6HSkVeJCU9czbA/exec";
+const CATS = ["飲食", "居家", "交通", "娛樂", "健康", "軟體", "其他"];
+const KW = {
+  "飲食": ["早餐","午餐","晚餐","消夜","宵夜","飲料","咖啡","便當","餐廳","早午餐","下午茶","零食","水果","超市","小吃","火鍋","燒烤","飲品","甜點","麵","飯","牛奶","手搖","早午"],
+  "居家": ["房租","水電","瓦斯","網路費","家具","日用品","清潔","管理費","家電","電費","水費","衛生紙","洗衣","房屋","租金"],
+  "交通": ["捷運","公車","計程車","uber","加油","停車","高鐵","火車","油錢","交通","機票","客運","悠遊卡"],
+  "娛樂": ["電影","遊戲","唱歌","打牌","旅遊","展覽","ktv","酒吧","遊樂園","netflix","演唱會","門票","出遊"],
+  "健康": ["健身","醫院","藥局","看醫生","牙醫","保健","運動","診所","掛號","眼鏡","健檢","藥妝"],
+  "軟體": ["軟體","訂閱","app","notion","chatgpt","claude","adobe","figma"]
+};
+const WEEK = "日一二三四五六";
+const $ = id => document.getElementById(id);
+const money = n => (n < 0 ? "-$" : "$") + Math.abs(Math.round(n)).toLocaleString("en-US");
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+
+/* ---------- 狀態 ---------- */
+let KEY = store.get("bud_key", "");
+let D = store.get("bud_data", null);      // 伺服器最後一次的資料
+let queue = store.get("bud_queue", []);   // 還沒存到試算表的動作，依序送
+let filter = "全部", reviewIdx = -1, flashId = null, tmp = -1;
+for (const op of queue) if (op.tmp && op.tmp <= tmp) tmp = op.tmp - 1;
+
+const todayKey = () => { const d = new Date(); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); };
+const parseKey = k => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
+const dayKey = d => d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const md = k => { const [, m, d] = k.split("-"); return m + "/" + d; };
+function guess(item) {
+  const t = (item || "").trim(); if (!t) return null;
+  if (D && D.learned && D.learned[t]) return D.learned[t];
+  const s = t.toLowerCase();
+  for (const c in KW) if (KW[c].some(w => s.includes(w))) return c;
+  return null;
+}
+function fmtDay(k) {
+  const dt = parseKey(k); const diff = Math.round((parseKey(todayKey()) - dt) / 864e5);
+  const base = md(k) + "（" + WEEK[dt.getDay()] + "）";
+  return diff === 0 ? "今天 " + base : diff === 1 ? "昨天 " + base : base;
+}
+
+/* ---------- 跟試算表溝通 ---------- */
+async function call(action, payload) {
+  const ac = new AbortController(); const tm = setTimeout(() => ac.abort(), 30000);
+  let res;
+  try { res = await fetch(API, { method: "POST", body: JSON.stringify({ t: KEY, action, payload: payload || {} }), signal: ac.signal }); }
+  catch (e) { throw new Error(e.name === "AbortError" ? "連線太久沒回應" : "連不上網路"); }
+  finally { clearTimeout(tm); }
+  let j; try { j = await res.json(); } catch (e) { throw new Error("試算表那邊回應怪怪的"); }
+  if (j.auth === false) { const err = new Error("密碼不對"); err.auth = true; throw err; }
+  if (!j.ok) { const err = new Error(j.error || "存檔失敗"); err.server = true; throw err; }
+  return j;
+}
+
+let busy = false, retryTimer = null;
+function enqueue(op) { queue.push(op); store.set("bud_queue", queue); flush(); }
+async function flush() {
+  if (busy || !queue.length) return;
+  busy = true; showSync();
+  try {
+    while (queue.length) {
+      const op = queue[0];
+      const res = await call(op.action, op.payload).catch(e => { if (e.server) return { serverError: e }; throw e; });
+      queue.shift();
+      if (res.serverError) { toast(res.serverError.message + "，這個動作沒有存到"); }
+      else if (op.tmp && res.id) {
+        // 新增的那筆拿到真正的編號，後面排隊的動作跟畫面都換成新編號
+        for (const q of queue) if (q.payload && q.payload.id === op.tmp) q.payload.id = res.id;
+        if (flashId === op.tmp) flashId = res.id;
+        undoRemap(op.tmp, res.id);
+      }
+      store.set("bud_queue", queue);
+      if (!queue.length && res.data) setData(res.data);
+    }
+  } catch (e) {
+    if (e.auth) { busy = false; return showLogin("密碼不對，請重新輸入"); }
+    clearTimeout(retryTimer); retryTimer = setTimeout(flush, 8000);
+  }
+  busy = false; showSync();
+}
+function showSync() {
+  $("sync").textContent = queue.length ? (busy ? "存到試算表中…" : "還有 " + queue.length + " 筆沒存到，連上網路會自動補送") : "";
+}
+async function refresh() {
+  if (!KEY || queue.length || busy) return;
+  try { const j = await call("load"); setData(j.data); }
+  catch (e) { if (e.auth) showLogin("密碼不對，請重新輸入"); }
+}
+function setData(data) {
+  // 正在打字或面板開著的時候先不要整個重畫
+  D = data; store.set("bud_data", D);
+  renderAll();
+}
+
+/* ---------- 本機先改（畫面先變，再存） ---------- */
+function localAdd(e) { D.entries.push(e); }
+function localRemove(id) { D.entries = D.entries.filter(x => x.id !== id); }
+let undoState = null;
+function undoRemap(a, b) { if (undoState && undoState.id === a) undoState.id = b; }
+
+/* ---------- 計算 ---------- */
+function calc() {
+  const es = D.entries;
+  const spent = es.reduce((s, e) => s + e.amt, 0);
+  const tk = todayKey();
+  const todaySpent = es.filter(e => e.date === tk).reduce((s, e) => s + e.amt, 0);
+  const left = D.budget - spent;
+  const days = Math.max(D.daysLeft || 1, 1);
+  return { spent, left, todaySpent, days, todayLeft: (left + todaySpent) / days - todaySpent };
+}
+function catTotals(list) { const t = {}; list.forEach(e => t[e.cat] = (t[e.cat] || 0) + e.amt); return t; }
+
+/* ---------- 畫面 ---------- */
+function itemHTML(e, sub) {
+  const small = [e.cat, sub].filter(Boolean).join(" · ");
+  return `<div class="item${e.id === flashId ? " flash" : ""}${e.id < 0 ? " pending" : ""}" data-id="${e.id}"><div class="n">${esc(e.item)}<small>${esc(small)}</small></div><div class="num">${money(e.amt)}</div></div>`;
+}
+const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function renderHome() {
+  const r = calc();
+  const fixed = D.fixed.reduce((s, f) => s + f.amt, 0);
+  $("h-sub").textContent = md(D.period.start) + " – " + md(D.period.end) + (fixed ? " · 固定支出 " + money(fixed) + " 另計" : "");
+  $("h-left").innerHTML = money(r.left) + "<small>／" + Math.round(D.budget).toLocaleString("en-US") + "</small>";
+  $("h-left").classList.toggle("neg", r.left < 0);
+  $("h-bar").style.width = Math.min(Math.max(r.spent / (D.budget || 1), 0), 1) * 100 + "%";
+  $("h-spent").textContent = money(r.spent);
+  $("h-today").textContent = money(r.todayLeft);
+  $("h-today").style.color = r.todayLeft < 0 ? "var(--red)" : "";
+  $("h-days").textContent = D.daysLeft;
+
+  const quick = (D.quick || []).length ? D.quick : [];
+  $("h-quick").style.display = quick.length ? "" : "none";
+  $("h-quick").innerHTML = `<span class="lab">快速記</span>` + quick.map(q => `<span data-quick="${esc(q.item)}" data-cat="${esc(q.cat)}">${esc(q.item)}</span>`).join("");
+
+  const t = catTotals(D.entries); const max = Math.max(...Object.values(t), 1);
+  const cats = CATS.filter(c => t[c]).sort((a, b) => t[b] - t[a]);
+  $("h-cats").innerHTML = cats.length ? cats.map(c =>
+    `<div class="cat num" data-cat-go="${c}"><span class="n">${c}</span><span class="bar"><i style="width:${t[c] / max * 100}%"></i></span><span class="m">${money(t[c])}</span></div>`).join("")
+    : `<div class="empty">這期還沒記帳</div>`;
+
+  const recent = [...D.entries].sort((a, b) => (parseKey(b.date) - parseKey(a.date)) || (sortKey(b) - sortKey(a))).slice(0, 3);
+  $("h-recent").innerHTML = recent.length ? recent.map(e => itemHTML(e, shortDay(e.date))).join("") : `<div class="empty">按下面的＋開始記第一筆</div>`;
+}
+function sortKey(e) { return e.id < 0 ? 9e15 - e.id : e.id; }
+function shortDay(k) { const f = fmtDay(k); return f.startsWith("今天") ? "今天" : f.startsWith("昨天") ? "昨天" : md(k); }
+
+function renderList() {
+  $("l-sub").textContent = md(D.period.start) + " – " + md(D.period.end);
+  const list = D.entries.filter(e => filter === "全部" || e.cat === filter);
+  $("l-sum").textContent = "共 " + list.length + " 筆 · " + money(list.reduce((s, e) => s + e.amt, 0));
+  $("l-filter").innerHTML = ["全部", ...CATS].map(k => `<span class="${k === filter ? "on" : ""}" data-filter="${k}">${k}</span>`).join("");
+  const days = {}; list.forEach(e => (days[e.date] = days[e.date] || []).push(e));
+  const keys = Object.keys(days).sort((a, b) => parseKey(b) - parseKey(a));
+  $("l-body").innerHTML = keys.length ? keys.map(k => {
+    const its = days[k].sort((a, b) => sortKey(b) - sortKey(a));
+    return `<div class="day num"><span>${fmtDay(k)}</span><span>${money(its.reduce((s, e) => s + e.amt, 0))}</span></div><div class="ledger">${its.map(e => itemHTML(e, e.note)).join("")}</div>`;
+  }).join("") : `<div class="empty">${filter === "全部" ? "這期還沒記帳" : "這期還沒有「" + filter + "」的花費"}</div>`;
+}
+
+function renderReview() {
+  const cur = { name: "本期", range: md(D.period.start) + " – " + md(D.period.end) + "（進行中）", total: calc().spent, cats: catTotals(D.entries), cur: true };
+  const hist = (D.history || []).filter(h => h.start !== D.period.start).map(h => {
+    const m = Number(h.start.split("-")[1]);
+    return { name: m + "月", range: md(h.start) + " – " + md(h.end), total: h.total, cats: h.cats };
+  });
+  const all = [...hist.slice(-4), cur];
+  if (reviewIdx < 0 || reviewIdx >= all.length) reviewIdx = all.length - 1;
+  const limit = D.defaultBudget || 35000;
+  const max = Math.max(...all.map(p => p.total), limit, 1);
+  $("r-bars").innerHTML = all.map((p, i) =>
+    `<div class="b${p.cur ? " cur" : ""}${p.total > limit && !p.cur ? " over" : ""}" data-rev="${i}">$${(p.total / 1000).toFixed(1)}k<i style="height:${p.total / max * 75}%"></i>${p.name}</div>`).join("");
+  $("r-seg").innerHTML = all.map((p, i) => `<span class="${i === reviewIdx ? "on" : ""}" data-rev="${i}">${p.name}</span>`).join("");
+  const p = all[reviewIdx], prev = all[reviewIdx - 1];
+  $("r-title").textContent = p.range;
+  const mx = Math.max(...Object.values(p.cats), 1);
+  $("r-cats").innerHTML = CATS.filter(c => p.cats[c]).sort((a, b) => p.cats[b] - p.cats[a]).map(c => {
+    let diff = "—";
+    if (prev && !p.cur) { const d = p.cats[c] - (prev.cats[c] || 0); diff = d === 0 ? "—" : (d > 0 ? "+" : "−") + "$" + Math.abs(Math.round(d)).toLocaleString(); }
+    return `<div class="cat num"><span class="n">${c}</span><span class="bar"><i style="width:${p.cats[c] / mx * 100}%"></i></span><span class="m">${money(p.cats[c])}</span><span class="diff">${diff}</span></div>`;
+  }).join("") || `<div class="empty">這期還沒有花費</div>`;
+}
+
+function renderSet() {
+  $("s-budget").textContent = money(D.budget);
+  $("s-fixed").innerHTML = D.fixed.map((f, i) => `<div class="set tap" data-fixed="${i}"><span>${esc(f.item)}</span><span class="num">${money(f.amt)}</span></div>`).join("");
+  $("s-sav-total").textContent = money(D.savings.total);
+  $("s-sav-list").innerHTML = D.savings.list.slice(0, 5).map(s =>
+    `<div class="item" data-sav="${s.id}"><div class="n">${s.amt < 0 ? "提領" : "存入"}${s.note ? `<small>${esc(s.note)}</small>` : ""}</div><div class="num" style="color:var(--sub)">${s.date ? md(s.date) : ""}</div><div class="num">${money(s.amt)}</div></div>`).join("");
+  $("s-end-note").innerHTML = "明細會收進「回顧」，預算設回 " + money(D.defaultBudget || 35000) + "。<br>按錯了下面會出現「復原」。";
+}
+
+function renderAll() { if (!D) return; renderHome(); renderList(); renderReview(); renderSet(); showSync(); }
+
+function go(page) {
+  document.querySelectorAll(".page").forEach(p => p.classList.toggle("on", p.id === "p-" + page));
+  document.querySelectorAll(".nav [data-go]").forEach(n => n.classList.toggle("on", n.dataset.go === page));
+  $("p-" + page).scrollTop = 0;
+}
+
+/* ---------- 提示 ---------- */
+let toastTimer, undoFn;
+function toast(text, undo, ms) {
+  $("toast-t").textContent = text; undoFn = undo || null;
+  $("toast-undo").style.display = undo ? "" : "none";
+  $("toast").classList.add("on");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { $("toast").classList.remove("on"); undoFn = null; }, ms || 4500);
+}
+$("toast-undo").onclick = () => { const f = undoFn; undoFn = null; $("toast").classList.remove("on"); if (f) f(); };
+function flash(id) { flashId = id; setTimeout(() => { if (flashId === id) flashId = null; document.querySelectorAll(".item.flash").forEach(n => n.classList.remove("flash")); }, 900); }
+
+/* ---------- 記一筆 ---------- */
+let sh = null;
+function openSheet(opts) {
+  if (!D) return;
+  sh = Object.assign({ amt: "", item: "", note: "", cat: null, catTouched: false, date: todayKey(), id: null }, opts);
+  $("sh-title").textContent = sh.id ? "改這筆" : "記一筆";
+  $("sh-save").textContent = sh.id ? "改好了" : "記下來";
+  $("sh-del").style.display = sh.id ? "block" : "none";
+  $("sh-item").value = sh.item; $("sh-note").value = sh.note;
+  if (!sh.cat) sh.cat = guess(sh.item);
+  drawSheet();
+  $("dim").classList.add("on"); $("sheet").classList.add("on");
+}
+function closeSheets() {
+  sh = null; fm = null;
+  $("dim").classList.remove("on"); $("sheet").classList.remove("on"); $("form").classList.remove("on");
+  document.activeElement && document.activeElement.blur && document.activeElement.blur();
+}
+function drawSheet() {
+  $("sh-amt").textContent = "$" + (sh.amt ? Number(sh.amt).toLocaleString("en-US") : "0");
+  const g = guess(sh.item);
+  $("sh-catlbl").textContent = !sh.item.trim() ? "分類" : sh.catTouched && g !== sh.cat ? "分類（用你選的，之後會記住）" : g ? "分類（自動猜的，猜錯點別的就好）" : "分類（猜不到，幫我選一個）";
+  const cat = sh.cat || "其他";
+  $("sh-cats").innerHTML = CATS.map(c => `<span class="${c === cat ? "on" : ""}" data-shcat="${c}">${c}</span>`).join("");
+  const near = [0, 1, 2].map(i => dayKey(addDays(new Date(), -i)));
+  const other = !near.includes(sh.date);
+  $("sh-days").innerHTML = ["今天", "昨天", "前天"].map((d, i) => `<span class="${near[i] === sh.date ? "on" : ""}" data-shday="${near[i]}">${d}</span>`).join("")
+    + `<span class="${other ? "on" : ""}" data-shday="pick">${other ? fmtDay(sh.date) : "選日期"}</span>`;
+  $("sh-save").disabled = !Number(sh.amt);
+}
+$("sh-keys").innerHTML = ["1","2","3","4","5","6","7","8","9","00","0","⌫"].map(k => `<span data-key="${k}">${k}</span>`).join("");
+function pressKey(k) {
+  if (k === "⌫") sh.amt = sh.amt.slice(0, -1);
+  else if (sh.amt.length < 7 && !(sh.amt === "" && k.startsWith("0"))) sh.amt += k;
+  drawSheet();
+}
+$("sh-keys").onclick = e => { const k = e.target.dataset.key; if (k && sh) pressKey(k); };
+$("sh-item").oninput = e => { sh.item = e.target.value; if (!sh.catTouched) sh.cat = guess(sh.item); drawSheet(); };
+$("sh-note").oninput = e => { sh.note = e.target.value; };
+$("sh-cats").onclick = e => { const t = e.target.closest("[data-shcat]"); if (!t) return; sh.cat = t.dataset.shcat; sh.catTouched = true; drawSheet(); };
+$("sh-days").onclick = e => {
+  const t = e.target.closest("[data-shday]"); if (!t) return;
+  if (t.dataset.shday === "pick") {
+    const [y, m, d] = sh.date.split("-"); $("sh-date").value = y + "-" + m.padStart(2, "0") + "-" + d.padStart(2, "0");
+    try { $("sh-date").showPicker(); } catch (_) { $("sh-date").focus(); $("sh-date").click(); }
+    return;
+  }
+  sh.date = t.dataset.shday; drawSheet();
+};
+$("sh-date").onchange = e => { if (!e.target.value || !sh) return; const [y, m, d] = e.target.value.split("-").map(Number); sh.date = dayKey(new Date(y, m - 1, d)); drawSheet(); };
+$("sh-cancel").onclick = closeSheets; $("dim").onclick = closeSheets;
+[$("sh-item"), $("sh-note")].forEach(el => el.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); el.blur(); } }));
+
+$("sh-save").onclick = () => {
+  const amt = Number(sh.amt); if (!amt) return;
+  const item = sh.item.trim() || sh.cat || "其他";
+  const cat = sh.cat || guess(item) || "其他";
+  const learn = !!(sh.item.trim() && sh.catTouched && guess(item) !== cat);
+  if (learn) D.learned[item] = cat;
+  const msg = learn ? "，以後「" + item + "」都歸" + cat : "";
+  const fields = { date: sh.date, item, amt, note: sh.note.trim(), cat };
+  if (sh.id) {
+    const e = D.entries.find(x => x.id === sh.id); if (!e) return closeSheets();
+    const before = { date: e.date, item: e.item, amt: e.amt, note: e.note, cat: e.cat };
+    Object.assign(e, fields); flash(e.id); closeSheets(); renderAll();
+    enqueue({ action: "update", payload: Object.assign({ id: e.id, learn }, fields) });
+    undoState = { id: e.id };
+    toast("已改成 " + item + " " + money(amt) + msg, () => {
+      const cur = D.entries.find(x => x.id === undoState.id) || e; Object.assign(cur, before); renderAll();
+      enqueue({ action: "update", payload: Object.assign({ id: cur.id }, before) });
+    });
+  } else {
+    const e = Object.assign({ id: tmp-- }, fields);
+    localAdd(e); flash(e.id); closeSheets(); renderAll();
+    enqueue({ action: "add", tmp: e.id, payload: Object.assign({ learn }, fields) });
+    undoState = { id: e.id };
+    toast("已記下 " + item + " " + money(amt) + msg, () => {
+      const id = undoState.id; localRemove(id); localRemove(e.id); renderAll();
+      enqueue({ action: "remove", payload: { id } });
+    });
+  }
+};
+$("sh-del").onclick = () => {
+  const e = D.entries.find(x => x.id === sh.id); if (!e) return closeSheets();
+  localRemove(e.id); closeSheets(); renderAll();
+  enqueue({ action: "remove", payload: { id: e.id } });
+  toast("已刪除 " + e.item + " " + money(e.amt), () => {
+    const back = Object.assign({}, e, { id: tmp-- }); localAdd(back); renderAll();
+    enqueue({ action: "add", tmp: back.id, payload: { date: e.date, item: e.item, amt: e.amt, note: e.note, cat: e.cat } });
+  });
+};
+
+/* ---------- 設定的小表單 ---------- */
+let fm = null;
+function openForm(o) {
+  fm = o;
+  $("f-title").textContent = o.title;
+  $("f-text-wrap").style.display = o.text === undefined ? "none" : "";
+  $("f-text").placeholder = o.textPh || ""; $("f-text").value = o.text || "";
+  $("f-amt").value = o.amt ? String(o.amt) : "";
+  $("f-save").textContent = o.ok || "好";
+  $("dim").classList.add("on"); $("form").classList.add("on");
+  setTimeout(() => (o.text !== undefined && !o.text ? $("f-text") : $("f-amt")).focus(), 260);
+}
+$("f-cancel").onclick = closeSheets;
+$("f-text").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("f-amt").focus(); } });
+$("f-amt").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("f-save").click(); } });
+$("f-save").onclick = () => {
+  const amt = Number(String($("f-amt").value).replace(/[^\d.]/g, ""));
+  const text = $("f-text").value.trim();
+  if (!amt) return $("f-amt").focus();
+  if (fm.text !== undefined && fm.needText && !text) return $("f-text").focus();
+  const f = fm; closeSheets(); f.done(amt, text);
+};
+
+$("s-budget-row").onclick = () => openForm({ title: "這期可花預算", amt: D.budget, done: amt => {
+  const before = D.budget; D.budget = amt; renderAll(); enqueue({ action: "setBudget", payload: { amt } });
+  toast("預算改成 " + money(amt), () => { D.budget = before; renderAll(); enqueue({ action: "setBudget", payload: { amt: before } }); });
+} });
+$("s-fixed-add").onclick = () => openForm({ title: "新增固定支出", text: "", textPh: "項目，例如：房租", needText: true, done: (amt, item) => {
+  D.fixed.push({ item, amt }); renderAll(); enqueue({ action: "addFixed", payload: { item, amt } });
+  toast("已新增固定支出 " + item + " " + money(amt), () => { const i = D.fixed.findIndex(f => f.item === item && f.amt === amt); if (i >= 0) D.fixed.splice(i, 1); renderAll(); enqueue({ action: "removeFixed", payload: { item, amt } }); });
+} });
+function savingForm(kind) {
+  openForm({ title: kind === "withdraw" ? "從儲蓄提領" : "存進儲蓄", text: "", textPh: "備註（可不填）", ok: kind === "withdraw" ? "提領" : "存入", done: (amt, note) => {
+    const v = kind === "withdraw" ? -amt : amt;
+    const s = { id: tmp--, date: todayKey(), amt: v, note };
+    D.savings.total += v; D.savings.list.unshift(s); renderAll();
+    enqueue({ action: "saving", tmp: s.id, payload: { kind, amt, note } });
+    undoState = { id: s.id };
+    toast((kind === "withdraw" ? "已提領 " : "已存入 ") + money(amt) + "，總存款 " + money(D.savings.total), () => {
+      const id = undoState.id; D.savings.total -= v; D.savings.list = D.savings.list.filter(x => x.id !== id && x.id !== s.id); renderAll();
+      enqueue({ action: "removeSaving", payload: { id } });
+    });
+  } });
+}
+$("s-dep").onclick = () => savingForm("deposit");
+$("s-wd").onclick = () => savingForm("withdraw");
+$("s-end").onclick = () => {
+  if (!D.entries.length) return toast("這期還沒有任何紀錄，不用結束");
+  const saved = JSON.parse(JSON.stringify(D));
+  D.entries = []; D.budget = D.defaultBudget || 35000; renderAll(); go("home");
+  enqueue({ action: "endPeriod" });
+  toast("新的一期開始了，預算 " + money(D.budget), () => { D = saved; renderAll(); enqueue({ action: "undoEnd" }); }, 12000);
+};
+
+/* ---------- 點擊 ---------- */
+$("app").addEventListener("click", e => {
+  const t = e.target;
+  const g = t.closest("[data-go]"); if (g) { if (g.dataset.go === "list") { filter = "全部"; renderList(); } return go(g.dataset.go); }
+  if (t.closest("#nav-add")) return openSheet({});
+  const q = t.closest("[data-quick]"); if (q) return openSheet({ item: q.dataset.quick, cat: q.dataset.cat, catTouched: true });
+  const cg = t.closest("[data-cat-go]"); if (cg) { filter = cg.dataset.catGo; renderList(); return go("list"); }
+  const f = t.closest("[data-filter]"); if (f) { filter = f.dataset.filter; return renderList(); }
+  const it = t.closest(".item[data-id]"); if (it) {
+    const x = D.entries.find(v => v.id === Number(it.dataset.id)); if (!x) return;
+    return openSheet({ id: x.id, amt: String(x.amt), item: x.item, note: x.note, cat: x.cat, catTouched: true, date: x.date });
+  }
+  const fx = t.closest("[data-fixed]"); if (fx) {
+    const i = Number(fx.dataset.fixed); const fobj = D.fixed[i];
+    D.fixed.splice(i, 1); renderAll(); enqueue({ action: "removeFixed", payload: { item: fobj.item, amt: fobj.amt } });
+    return toast("已刪除固定支出 " + fobj.item, () => { D.fixed.splice(i, 0, fobj); renderAll(); enqueue({ action: "addFixed", payload: fobj }); });
+  }
+  const sv = t.closest("[data-sav]"); if (sv) {
+    const s = D.savings.list.find(x => x.id === Number(sv.dataset.sav)); if (!s || s.id < 0) return;
+    D.savings.list = D.savings.list.filter(x => x !== s); D.savings.total -= s.amt; renderAll();
+    enqueue({ action: "removeSaving", payload: { id: s.id } });
+    return toast("已刪除這筆" + (s.amt < 0 ? "提領" : "存入") + " " + money(Math.abs(s.amt)), () => {
+      const back = Object.assign({}, s, { id: tmp-- }); D.savings.list.unshift(back); D.savings.total += s.amt; renderAll();
+      enqueue({ action: "saving", tmp: back.id, payload: { kind: s.amt < 0 ? "withdraw" : "deposit", amt: Math.abs(s.amt), note: s.note } });
+    });
+  }
+  const rv = t.closest("[data-rev]"); if (rv) { reviewIdx = Number(rv.dataset.rev); return renderReview(); }
+  if (t.closest("#bunny")) return bunnyTalk();
+});
+
+/* 電腦上可以直接打數字、Enter 記下、Esc 關掉 */
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && (sh || fm)) return closeSheets();
+  if (!sh || e.target.tagName === "INPUT") return;
+  if (e.key === "Enter") { e.preventDefault(); return $("sh-save").click(); }
+  if (/^[0-9]$/.test(e.key)) pressKey(e.key);
+  else if (e.key === "Backspace") pressKey("⌫");
+});
+
+/* ---------- 小兔子 ---------- */
+let bubbleTimer, lastLine;
+function bunnyTalk() {
+  const b = $("bunny"); b.classList.remove("wig"); void b.offsetWidth; b.classList.add("wig");
+  if (!D) return;
+  const r = calc(); const lines = [];
+  if (r.todaySpent === 0) lines.push("今天還沒花錢，好厲害");
+  if (r.todayLeft > 0 && r.todaySpent > 0) lines.push("今天還有 " + money(r.todayLeft) + " 可以用");
+  if (r.todayLeft < 0) lines.push("今天花多了，明天少一點就好");
+  lines.push("再 " + D.daysLeft + " 天就到存款日", "有記帳的你很棒", "記得喝水", "剪片辛苦了");
+  let line; do { line = lines[Math.floor(Math.random() * lines.length)]; } while (line === lastLine && lines.length > 1);
+  lastLine = line;
+  $("bubble").textContent = line; $("bubble").classList.add("on");
+  clearTimeout(bubbleTimer); bubbleTimer = setTimeout(() => $("bubble").classList.remove("on"), 2200);
+}
+
+/* ---------- 登入 ---------- */
+function showLogin(msg) { $("login-msg").textContent = msg || ""; $("login").classList.add("on"); setTimeout(() => $("login-in").focus(), 100); }
+$("login-go").onclick = async () => {
+  const k = $("login-in").value.trim(); if (!k) return;
+  KEY = k; $("login-msg").textContent = "確認中…";
+  try { const j = await call("load"); store.set("bud_key", KEY); $("login").classList.remove("on"); setData(j.data); flush(); }
+  catch (e) { $("login-msg").textContent = e.auth ? "密碼不對，再試一次" : e.message + "，等一下再試"; }
+};
+$("login-in").addEventListener("keydown", e => { if (e.key === "Enter") $("login-go").click(); });
+
+/* ---------- 新版自動更新 ---------- */
+async function checkVer() {
+  if (VER === "dev" || queue.length || sh || fm) return;
+  try { const t = await (await fetch("./?v=" + Date.now(), { cache: "no-store" })).text(); const m = t.match(/\/\*VER\*\/'(\w+)'/); if (m && m[1] !== VER) location.reload(); } catch (e) {}
+}
+
+/* ---------- 開始 ---------- */
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { flush(); refresh(); checkVer(); } });
+window.addEventListener("online", flush);
+if (!KEY) showLogin();
+else { if (D) renderAll(); flush(); refresh(); }
+</script>
+</body>
+</html>
